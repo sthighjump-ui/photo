@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ふたりの毎日写真カレンダー</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      background-color: #faf9f6; /* 温かみのあるオフホワイト */
+    }
+    /* カスタムスクロールバー非表示 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* 写真のフェードインアニメーション */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="text-stone-800 antialiased selection:bg-rose-200">
+
+  <!-- ==================== 初期設定（役割選択のみ）画面 ==================== -->
+  <div id="setup-screen" class="min-h-screen flex flex-col justify-center items-center p-6 hidden">
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-sm border border-stone-200/80 p-8 animate-fade-in">
+      <div class="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+        <i data-lucide="camera" class="w-7 h-7"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-center text-stone-800 mb-2">ふたりの写真カレンダー</h1>
+      <p class="text-sm text-stone-500 text-center mb-8 leading-relaxed">
+        1日1枚ずつ、毎日の景色を残そう。<br>どっちのスマホか選んでスタート！
+      </p>
+
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <button type="button" onclick="enterAs('p1')" class="py-6 px-4 rounded-2xl border-2 border-stone-200 hover:border-sky-400 hover:bg-sky-50/40 active:scale-95 flex flex-col items-center justify-center gap-2 transition-all">
+            <span class="text-3xl">👦</span>
+            <span class="text-base font-bold text-stone-800">しゅんちゃん</span>
+          </button>
+          <button type="button" onclick="enterAs('p2')" class="py-6 px-4 rounded-2xl border-2 border-stone-200 hover:border-rose-400 hover:bg-rose-50/40 active:scale-95 flex flex-col items-center justify-center gap-2 transition-all">
+            <span class="text-3xl">👧</span>
+            <span class="text-base font-bold text-stone-800">ゆうちゃん</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== メイン（カレンダー）画面 ==================== -->
+  <div id="main-screen" class="min-h-screen flex flex-col max-w-2xl mx-auto hidden">
+    <!-- ヘッダー -->
+    <header class="sticky top-0 z-20 bg-[#faf9f6]/90 backdrop-blur-md border-b border-stone-200/60 px-4 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button onclick="changeMonth(-1)" class="p-2 rounded-xl hover:bg-stone-200/60 active:scale-95 transition-all text-stone-600" aria-label="前の月">
+          <i data-lucide="chevron-left" class="w-5 h-5"></i>
+        </button>
+        <h2 id="current-month-label" class="text-lg font-bold tracking-tight text-stone-800 min-w-[110px] text-center">
+          2026年 11月
+        </h2>
+        <button onclick="changeMonth(1)" class="p-2 rounded-xl hover:bg-stone-200/60 active:scale-95 transition-all text-stone-600" aria-label="次の月">
+          <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="goToToday()" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-stone-200/70 hover:bg-stone-300/70 text-stone-700 transition-colors">
+          今日
+        </button>
+        <button onclick="openSettingsModal()" class="p-2 rounded-xl hover:bg-stone-200/60 text-stone-600 transition-colors" aria-label="設定">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 曜日ヘッダー -->
+    <div class="grid grid-cols-7 border-b border-stone-200/60 bg-white/50 py-2 text-center text-[11px] font-bold text-stone-400">
+      <div class="text-rose-400">日</div>
+      <div>月</div>
+      <div>火</div>
+      <div>水</div>
+      <div>木</div>
+      <div>金</div>
+      <div class="text-sky-500">土</div>
+    </div>
+
+    <!-- カレンダーグリッド -->
+    <main class="flex-1 p-1.5 sm:p-3">
+      <!-- 凡例ガイド -->
+      <div class="flex items-center justify-between px-1 pb-2 text-[11px] text-stone-500">
+        <span>日付をタップして写真を登録・確認</span>
+        <div class="flex items-center gap-2.5">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-500"></span>しゅんちゃん</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span>ゆうちゃん</span>
+        </div>
+      </div>
+      <div id="calendar-grid" class="grid grid-cols-7 gap-1 sm:gap-2">
+        <!-- JSで日付セルを動的生成 -->
+      </div>
+    </main>
+
+    <!-- フッター（今日の投稿ショートカット） -->
+    <footer class="sticky bottom-0 z-20 p-4 bg-gradient-to-t from-[#faf9f6] via-[#faf9f6] to-transparent pointer-events-none">
+      <div class="max-w-md mx-auto flex justify-center pointer-events-auto">
+        <button onclick="openTodayModal()" class="flex items-center gap-2.5 bg-stone-900 hover:bg-stone-800 active:scale-95 text-white px-6 py-3.5 rounded-full shadow-lg shadow-stone-900/15 font-bold text-sm transition-all">
+          <i data-lucide="camera" class="w-4 h-4 text-rose-400"></i>
+          <span id="today-cta-text">今日の1枚をのこす</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ==================== 日付詳細モーダル（写真閲覧＆アップロード） ==================== -->
+  <div id="day-modal" class="fixed inset-0 z-50 hidden">
+    <!-- 背景オーバーレイ -->
+    <div onclick="closeDayModal()" class="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity"></div>
+    
+    <!-- モーダル本体 -->
+    <div class="relative min-h-screen sm:min-h-0 sm:my-8 flex items-end sm:items-center justify-center pointer-events-none">
+      <div class="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto animate-fade-in max-h-[92vh] flex flex-col">
+        
+        <!-- モーダルヘッダー -->
+        <div class="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-white">
+          <div class="flex items-center gap-2">
+            <span id="modal-date-title" class="text-lg font-bold text-stone-800">2026年11月15日 (日)</span>
+            <span id="modal-today-badge" class="hidden text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">TODAY</span>
+          </div>
+          <button onclick="closeDayModal()" class="p-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- 写真エリア（スクロール可能） -->
+        <div class="p-5 overflow-y-auto space-y-6">
+          
+          <!-- しゅんちゃんの枠 -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">👦</span>
+                <span class="text-sm font-bold text-stone-700">しゅんちゃん</span>
+                <span id="p1-you-badge" class="hidden text-[10px] font-semibold bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">あなた</span>
+              </div>
+              <button id="p1-delete-btn" onclick="confirmDeletePhoto('p1')" class="hidden text-xs text-stone-400 hover:text-rose-500 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-rose-50 transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>削除して撮り直す</span>
+              </button>
+            </div>
+            
+            <!-- 写真表示 or アップロード枠 -->
+            <div id="p1-photo-container" class="relative w-full aspect-[4/3] bg-stone-100 rounded-2xl overflow-hidden border border-stone-200/80 flex items-center justify-center">
+              <!-- JSで中身を描画 -->
+            </div>
+          </div>
+
+          <!-- ゆうちゃんの枠 -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">👧</span>
+                <span class="text-sm font-bold text-stone-700">ゆうちゃん</span>
+                <span id="p2-you-badge" class="hidden text-[10px] font-semibold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">あなた</span>
+              </div>
+              <button id="p2-delete-btn" onclick="confirmDeletePhoto('p2')" class="hidden text-xs text-stone-400 hover:text-rose-500 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-rose-50 transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>削除して撮り直す</span>
+              </button>
+            </div>
+
+            <!-- 写真表示 or アップロード枠 -->
+            <div id="p2-photo-container" class="relative w-full aspect-[4/3] bg-stone-100 rounded-2xl overflow-hidden border border-stone-200/80 flex items-center justify-center">
+              <!-- JSで中身を描画 -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 設定・共有モーダル ==================== -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden">
+    <div onclick="closeSettingsModal()" class="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"></div>
+    <div class="relative min-h-screen flex items-center justify-center p-4 pointer-events-none">
+      <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-6 pointer-events-auto animate-fade-in space-y-5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold text-stone-800">設定・ふたりの共有</h3>
+          <button onclick="closeSettingsModal()" class="p-1.5 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="bg-stone-50 p-4 rounded-2xl border border-stone-200/70 space-y-3">
+          <div>
+            <span class="text-[11px] font-bold text-stone-400 uppercase">URLでふたりを共有</span>
+            <p class="text-xs text-stone-500 mt-1 leading-relaxed">
+              このページのURLをコピーして、もう1人に送るだけで同じカレンダーが共有されます。
+            </p>
+          </div>
+          <button onclick="copyShareUrl()" class="w-full py-2.5 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all">
+            <i data-lucide="link" class="w-3.5 h-3.5"></i>
+            <span>共有URLをコピー</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between py-2 border-t border-stone-100">
+          <span class="text-sm text-stone-600">現在の表示</span>
+          <span id="settings-role-label" class="text-sm font-bold text-stone-800">👦 しゅんちゃん</span>
+        </div>
+
+        <button onclick="switchRole()" class="w-full py-3 rounded-2xl border border-stone-200 text-stone-700 hover:bg-stone-100 font-bold text-sm transition-colors">
+          しゅんちゃん / ゆうちゃん を切り替える
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 確認ダイアログ（alert/confirm代替） ==================== -->
+  <div id="confirm-modal" class="fixed inset-0 z-[60] hidden">
+    <div class="absolute inset-0 bg-stone-900/60 backdrop-blur-xs"></div>
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-xs bg-white rounded-3xl shadow-2xl p-6 text-center space-y-4 animate-fade-in">
+        <div class="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto">
+          <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        </div>
+        <h4 id="confirm-title" class="font-bold text-stone-800">写真を削除しますか？</h4>
+        <p id="confirm-desc" class="text-xs text-stone-500 leading-relaxed">削除すると、この日の新しい写真をもう一度アップできるようになります。</p>
+        <div class="grid grid-cols-2 gap-2 pt-2">
+          <button onclick="closeConfirmModal()" class="py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs">キャンセル</button>
+          <button id="confirm-exec-btn" class="py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs">削除する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== トースト通知 ==================== -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] bg-stone-900 text-white text-xs font-bold px-4 py-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2">
+    <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">保存しました</span>
+  </div>
+
+  <!-- ==================== ローディングオーバーレイ ==================== -->
+  <div id="loading-overlay" class="fixed inset-0 z-[80] bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center hidden">
+    <div class="w-10 h-10 border-4 border-stone-200 border-t-rose-500 rounded-full animate-spin mb-3"></div>
+    <p id="loading-text" class="text-xs font-bold text-stone-600">読み込み中...</p>
+  </div>
+
+  <!-- Supabase JS SDK (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- アプリケーションロジック -->
+  <script>
+    // =========================================================================
+    // 【Supabase 接続設定（組み込み済み）】
+    // =========================================================================
+    const SUPABASE_URL = "https://fbocijlwukvwxjygvugc.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_QkkYnSKi8m1bdl2YJiPv_A_iFJT9_dA";
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // アプリ状態
+    let state = {
+      role: '', // 'p1' (しゅんちゃん) or 'p2' (ゆうちゃん)
+      currentYear: new Date().getFullYear(),
+      currentMonth: new Date().getMonth(), // 0-indexed
+      selectedDateStr: '', // 'YYYY-MM-DD'
+      photosByDate: {} // { '2026-11-15': { p1: 'data:image/...', p2: 'data:image/...' } }
+    };
+
+    // アイコン初期化
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    // ==================== 初期化処理 ====================
+    function initApp() {
+      // まずは役割選択画面を表示
+      document.getElementById('setup-screen').classList.remove('hidden');
+    }
+
+    // ==================== セットアップ画面の操作 ====================
+    window.enterAs = (role) => {
+      state.role = role;
+      startMainApp();
+    };
+
+    // ==================== メインアプリ開始＆リアルタイム同期 ====================
+    async function startMainApp() {
+      document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('main-screen').classList.remove('hidden');
+
+      renderCalendar();
+      await fetchAllPhotos();
+      subscribeToRealtime();
+    }
+
+    // Supabaseから全件取得
+    async function fetchAllPhotos() {
+      try {
+        const { data, error } = await supabaseClient
+          .from('daily_photos')
+          .select('*');
+
+        if (error) {
+          console.error("Supabase Fetch Error:", error);
+          showToast("テーブル準備中、または接続を確認してください");
+          return;
+        }
+
+        const newMap = {};
+        if (data) {
+          data.forEach((row) => {
+            newMap[row.date_str] = {
+              p1: row.p1,
+              p2: row.p2
+            };
+          });
+        }
+        state.photosByDate = newMap;
+        renderCalendar();
+        updateTodayCTA();
+
+        // モーダルが開いていたら中身も最新化
+        if (!document.getElementById('day-modal').classList.contains('hidden') && state.selectedDateStr) {
+          renderDayModalContent(state.selectedDateStr);
+        }
+      } catch (err) {
+        console.error("Unexpected Fetch Error:", err);
+      }
+    }
+
+    // リアルタイム更新の購読（相手がアップしたら即反映）
+    function subscribeToRealtime() {
+      supabaseClient
+        .channel('daily_photos_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'daily_photos' },
+          () => {
+            fetchAllPhotos();
+          }
+        )
+        .subscribe();
+    }
+
+    // ==================== カレンダー描画ロジック ====================
+    function getTodayStr() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function updateTodayCTA() {
+      const todayStr = getTodayStr();
+      const todayData = state.photosByDate[todayStr] || {};
+      const myPhoto = todayData[state.role];
+      const ctaText = document.getElementById('today-cta-text');
+      if (myPhoto) {
+        ctaText.textContent = "今日の写真を見る";
+      } else {
+        ctaText.textContent = "今日の1枚をのこす";
+      }
+    }
+
+    window.changeMonth = (delta) => {
+      state.currentMonth += delta;
+      if (state.currentMonth < 0) {
+        state.currentMonth = 11;
+        state.currentYear--;
+      } else if (state.currentMonth > 11) {
+        state.currentMonth = 0;
+        state.currentYear++;
+      }
+      renderCalendar();
+    };
+
+    window.goToToday = () => {
+      const now = new Date();
+      state.currentYear = now.getFullYear();
+      state.currentMonth = now.getMonth();
+      renderCalendar();
+    };
+
+    function renderCalendar() {
+      const year = state.currentYear;
+      const month = state.currentMonth;
+      document.getElementById('current-month-label').textContent = `${year}年 ${month + 1}月`;
+
+      const grid = document.getElementById('calendar-grid');
+      grid.innerHTML = '';
+
+      const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0(日) - 6(土)
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const todayStr = getTodayStr();
+
+      // 月初めの空白セル
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'aspect-[3/4] sm:aspect-square rounded-2xl bg-stone-100/40';
+        grid.appendChild(emptyCell);
+      }
+
+      // 日付セルの生成
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = (dateStr === todayStr);
+        const isFuture = (dateStr > todayStr);
+        const dayData = state.photosByDate[dateStr] || {};
+        const p1Img = dayData.p1;
+        const p2Img = dayData.p2;
+        const hasAnyPhoto = Boolean(p1Img || p2Img);
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.disabled = isFuture;
+        cell.onclick = () => openDayModal(dateStr);
+
+        // セルの基本スタイル
+        let borderClass = isToday ? 'ring-2 ring-rose-500 border-transparent' : 'border border-stone-200/80';
+        let bgClass = isFuture ? 'bg-stone-100/50 opacity-40 cursor-not-allowed' : 'bg-white hover:border-stone-400 active:scale-95 cursor-pointer shadow-2xs';
+        
+        cell.className = `relative aspect-[3/4] sm:aspect-square rounded-xl sm:rounded-2xl overflow-hidden flex flex-col transition-all ${borderClass} ${bgClass}`;
+
+        // 写真サムネイルのレイアウト（2人分を左右分割で表示）
+        let mediaHTML = '';
+        if (hasAnyPhoto) {
+          mediaHTML = `
+            <div class="absolute inset-0 grid grid-cols-2 w-full h-full">
+              <!-- 左：しゅんちゃん -->
+              <div class="relative h-full bg-stone-100 border-r border-white/60 overflow-hidden">
+                ${p1Img 
+                  ? `<img src="${p1Img}" alt="しゅんちゃん" class="w-full h-full object-cover">
+                     <span class="absolute bottom-1 left-1 bg-sky-500/90 text-white text-[9px] font-bold px-1 rounded shadow-2xs">しゅん</span>` 
+                  : `<div class="w-full h-full flex items-center justify-center text-[10px] text-stone-300">👦</div>`
+                }
+              </div>
+              <!-- 右：ゆうちゃん -->
+              <div class="relative h-full bg-stone-100 overflow-hidden">
+                ${p2Img 
+                  ? `<img src="${p2Img}" alt="ゆうちゃん" class="w-full h-full object-cover">
+                     <span class="absolute bottom-1 right-1 bg-rose-500/90 text-white text-[9px] font-bold px-1 rounded shadow-2xs">ゆう</span>` 
+                  : `<div class="w-full h-full flex items-center justify-center text-[10px] text-stone-300">👧</div>`
+                }
+              </div>
+            </div>
+            <!-- 日付が見やすいように上部にグラデーション -->
+            <div class="absolute inset-x-0 top-0 h-7 bg-gradient-to-b from-black/50 to-transparent pointer-events-none"></div>
+          `;
+        } else if (!isFuture) {
+          // 写真がまだない日のアイコン
+          mediaHTML = `
+            <div class="flex-1 flex items-center justify-center">
+              ${isToday 
+                ? `<span class="w-6 h-6 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center"><i data-lucide="plus" class="w-3.5 h-3.5"></i></span>` 
+                : `<span class="w-1.5 h-1.5 rounded-full bg-stone-200"></span>`
+              }
+            </div>
+          `;
+        }
+
+        // 日付数字バッジ
+        const numColor = hasAnyPhoto 
+          ? 'text-white drop-shadow-xs' 
+          : (isToday ? 'text-rose-600 font-extrabold' : 'text-stone-600');
+
+        cell.innerHTML = `
+          ${mediaHTML}
+          <span class="relative z-10 text-[11px] sm:text-xs font-bold px-1.5 pt-1 text-left ${numColor}">
+            ${day}
+          </span>
+        `;
+
+        grid.appendChild(cell);
+      }
+
+      lucide.createIcons();
+    }
+
+    // ==================== 日付詳細モーダル ====================
+    window.openTodayModal = () => {
+      goToToday();
+      openDayModal(getTodayStr());
+    };
+
+    window.openDayModal = (dateStr) => {
+      state.selectedDateStr = dateStr;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const weekdayStr = weekdays[dateObj.getDay()];
+
+      document.getElementById('modal-date-title').textContent = `${y}年${m}月${d}日 (${weekdayStr})`;
+      
+      const todayBadge = document.getElementById('modal-today-badge');
+      if (dateStr === getTodayStr()) {
+        todayBadge.classList.remove('hidden');
+      } else {
+        todayBadge.classList.add('hidden');
+      }
+
+      // 「あなた」バッジの表示切替
+      document.getElementById('p1-you-badge').classList.toggle('hidden', state.role !== 'p1');
+      document.getElementById('p2-you-badge').classList.toggle('hidden', state.role !== 'p2');
+
+      renderDayModalContent(dateStr);
+      document.getElementById('day-modal').classList.remove('hidden');
+    };
+
+    window.closeDayModal = () => {
+      document.getElementById('day-modal').classList.add('hidden');
+      state.selectedDateStr = '';
+    };
+
+    function renderDayModalContent(dateStr) {
+      const dayData = state.photosByDate[dateStr] || {};
+      
+      ['p1', 'p2'].forEach((personKey) => {
+        const imgData = dayData[personKey];
+        const container = document.getElementById(`${personKey}-photo-container`);
+        const deleteBtn = document.getElementById(`${personKey}-delete-btn`);
+        const isMe = (state.role === personKey);
+
+        if (imgData) {
+          // 写真がアップロード済みの場合
+          container.innerHTML = `
+            <img src="${imgData}" alt="${personKey}" class="w-full h-full object-cover animate-fade-in">
+          `;
+          // 自分の写真であれば削除ボタンを表示（1日1枚制限のため、やり直す場合は一度削除）
+          if (isMe) {
+            deleteBtn.classList.remove('hidden');
+          } else {
+            deleteBtn.classList.add('hidden');
+          }
+        } else {
+          // まだ写真がない場合
+          deleteBtn.classList.add('hidden');
+          if (isMe) {
+            // 自分の枠なら直接タップできるファイル選択ラベルを表示（どの環境でも確実に開く）
+            container.innerHTML = `
+              <label class="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-600 hover:text-rose-500 hover:bg-rose-50/40 transition-colors cursor-pointer group">
+                <input type="file" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                <div class="w-12 h-12 rounded-full bg-white shadow-xs border border-stone-200 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <i data-lucide="camera" class="w-6 h-6 text-rose-500"></i>
+                </div>
+                <span class="text-xs font-bold">タップして写真を選ぶ</span>
+                <span class="text-[10px] text-stone-400">カメラ撮影・アルバムから1枚選択</span>
+              </label>
+            `;
+          } else {
+            // 相手の枠なら待機表示
+            container.innerHTML = `
+              <div class="flex flex-col items-center justify-center gap-1.5 text-stone-400">
+                <i data-lucide="image" class="w-6 h-6 opacity-40"></i>
+                <span class="text-xs font-medium">まだアップされていません</span>
+              </div>
+            `;
+          }
+        }
+      });
+
+      lucide.createIcons();
+    }
+
+    // ==================== 画像選択・圧縮・アップロード ====================
+    window.handleFileSelect = async (event) => {
+      const file = event.target.files[0];
+      if (!file || !state.selectedDateStr) return;
+
+      // すでに自分の写真がある場合は1日1枚制限によりブロック
+      const existingData = state.photosByDate[state.selectedDateStr] || {};
+      if (existingData[state.role]) {
+        showToast("1日1枚までです。変更する場合は一度削除してください");
+        return;
+      }
+
+      try {
+        showLoading("写真を最適化して保存中...");
+        // 画像をリサイズ＆JPEG圧縮
+        const compressedBase64 = await compressImage(file, 900, 0.78);
+
+        // 既存レコードとマージしてupsert
+        const payload = {
+          date_str: state.selectedDateStr,
+          p1: existingData.p1 || null,
+          p2: existingData.p2 || null,
+          updated_at: Date.now()
+        };
+        payload[state.role] = compressedBase64;
+
+        const { error } = await supabaseClient
+          .from('daily_photos')
+          .upsert(payload, { onConflict: 'date_str' });
+
+        if (error) throw error;
+
+        // ローカル状態も即反映
+        state.photosByDate[state.selectedDateStr] = {
+          p1: payload.p1,
+          p2: payload.p2
+        };
+        renderCalendar();
+        updateTodayCTA();
+        renderDayModalContent(state.selectedDateStr);
+
+        hideLoading();
+        showToast("1枚をのこしました！");
+      } catch (error) {
+        console.error("Upload Error:", error);
+        hideLoading();
+        showToast("保存に失敗しました。SQLテーブル作成を確認してください");
+      }
+    };
+
+    // Canvasを使って画像をリサイズ・圧縮する関数
+    function compressImage(file, maxSize, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxSize) {
+                height = Math.round((height * maxSize) / width);
+                width = maxSize;
+              }
+            } else {
+              if (height > maxSize) {
+                width = Math.round((width * maxSize) / height);
+                height = maxSize;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(dataUrl);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ==================== 写真削除（撮り直し用） ====================
+    let pendingDeleteRole = null;
+    window.confirmDeletePhoto = (roleKey) => {
+      if (roleKey !== state.role) return;
+      pendingDeleteRole = roleKey;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+      document.getElementById('confirm-exec-btn').onclick = executeDeletePhoto;
+    };
+
+    window.closeConfirmModal = () => {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      pendingDeleteRole = null;
+    };
+
+    async function executeDeletePhoto() {
+      if (!pendingDeleteRole || !state.selectedDateStr) return;
+      const targetRole = pendingDeleteRole;
+      const targetDate = state.selectedDateStr;
+      closeConfirmModal();
+
+      try {
+        showLoading("削除中...");
+        const existingData = state.photosByDate[targetDate] || {};
+        const payload = {
+          date_str: targetDate,
+          p1: existingData.p1 || null,
+          p2: existingData.p2 || null,
+          updated_at: Date.now()
+        };
+        payload[targetRole] = null;
+
+        const { error } = await supabaseClient
+          .from('daily_photos')
+          .upsert(payload, { onConflict: 'date_str' });
+
+        if (error) throw error;
+
+        state.photosByDate[targetDate] = {
+          p1: payload.p1,
+          p2: payload.p2
+        };
+        renderCalendar();
+        updateTodayCTA();
+        renderDayModalContent(targetDate);
+
+        hideLoading();
+        showToast("削除しました");
+      } catch (error) {
+        console.error("Delete Error:", error);
+        hideLoading();
+        showToast("削除に失敗しました");
+      }
+    }
+
+    // ==================== 設定モーダル・その他UIヘルパー ====================
+    window.openSettingsModal = () => {
+      document.getElementById('settings-role-label').textContent = state.role === 'p1' ? '👦 しゅんちゃん' : '👧 ゆうちゃん';
+      document.getElementById('settings-modal').classList.remove('hidden');
+    };
+
+    window.closeSettingsModal = () => {
+      document.getElementById('settings-modal').classList.add('hidden');
+    };
+
+    window.copyShareUrl = () => {
+      const tempInput = document.createElement('input');
+      tempInput.value = window.location.href;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      showToast("URLをコピーしました！");
+    };
+
+    window.switchRole = () => {
+      closeSettingsModal();
+      document.getElementById('main-screen').classList.add('hidden');
+      document.getElementById('setup-screen').classList.remove('hidden');
+    };
+
+    function showLoading(text) {
+      document.getElementById('loading-text').textContent = text;
+      document.getElementById('loading-overlay').classList.remove('hidden');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-overlay').classList.add('hidden');
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-message').textContent = msg;
+      toast.classList.remove('opacity-0', '-translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-2');
+      }, 2800);
+    }
+
+    // アプリ起動
+    initApp();
+  </script>
+</body>
+</html>
